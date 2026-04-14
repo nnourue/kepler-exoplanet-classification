@@ -36,14 +36,14 @@ a soft voting ensemble.
 | XGBoost (tuned) | 0.80 | 0.76 |
 | Ensemble (XGB + RF) | 0.81 | 0.77 |
 
-> **98% accuracy** when classifying confirmed planets against false positives.
+> **0.98 accuracy** when classifying confirmed planets against false positives.
 
 The trickiest class was CANDIDATE, and that's not a model failure; that's just
 reality. These are objects scientists haven't confirmed yet, so no algorithm can
 reliably classify something that astronomers themselves are still unsure about.
 
 To test this, I ran a binary classifier on just FALSE POSITIVE vs CONFIRMED,
-dropping CANDIDATEs entirely. The results jumped to **98% accuracy** and
+dropping CANDIDATEs entirely. The results jumped to **0.98 accuracy** and
 **0.97 macro F1**, which confirms the multiclass ambiguity was coming from
 the labels, not the model.
 
