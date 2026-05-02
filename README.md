@@ -6,15 +6,15 @@ A machine learning pipeline to classify exoplanet candidates from NASA's Kepler 
 
 ## Overview
 
-NASA's Kepler Space Telescope identified thousands of potential planets by monitoring stellar brightness across the galaxy. However, a significant portion of these signals originates from eclipsing binary stars, instrument artefacts, or other astrophysical phenomena — not actual planets. Distinguishing real planets from false positives is a critical step in exoplanet research.
+NASA's Kepler Space Telescope identified thousands of potential planets by monitoring stars across the galaxy, recording physical properties such as orbital periods, planetary radii, and stellar temperatures in Kelvin. However, a significant portion of these signals originates from eclipsing binary stars, instrument artefacts, or other astrophysical phenomena that are not actual planets. Distinguishing real planets from false positives is a critical step in exoplanet research.
 
 Kepler flagged over 9,000 objects of interest during its mission. Each one had to be reviewed and labelled:
 
 - **Confirmed** — a verified exoplanet
 - **False Positive** — a mimicking signal, usually an eclipsing binary star or instrument artefact
-- **Candidate** — unresolved, awaiting follow-up confirmation
+- **Candidate** — not yet reviewed and assigned a definitive label
 
-Manual review is expensive and slow. This project automates the triage using machine learning, and for the ~400 unresolved candidates in the dataset, ranks them by how likely they are to be real planets — helping prioritise which ones deserve follow-up attention first.
+Manual review is expensive and slow. This project automates the triage using machine learning, and for the ~400 unresolved candidates in the dataset, ranks them by how likely they are to be real planets, helping prioritise which ones deserve follow-up attention first.
 
 ---
 
@@ -26,8 +26,8 @@ Manual review is expensive and slow. This project automates the triage using mac
 
 | Label | Class | Description |
 |-------|-------|-------------|
-| 0 | FALSE POSITIVE | Not a real exoplanet — likely an eclipsing binary or instrument artefact |
-| 1 | CANDIDATE | Unresolved — astronomers haven't confirmed or ruled it out yet |
+| 0 | FALSE POSITIVE | Not a real exoplanet, likely an eclipsing binary or instrument artefact |
+| 1 | CANDIDATE | Not yet reviewed and assigned a definitive label |
 | 2 | CONFIRMED | Verified exoplanet |
 
 ---
@@ -38,7 +38,7 @@ The dataset had 9 orbital and stellar features, so I started by engineering 5 ne
 
 - **`koi_multiplicity`** — counts how many candidates share the same host star. Multi-planet systems carry a strong prior toward authenticity; the probability of multiple independent false signals occurring around the same star by chance is extremely low.
 - **`score_sq`** — KOI score squared, to amplify the difference between high and low confidence signals. This turned out to be the single most important feature in the model according to SHAP analysis.
-- **`radius_ratio`** — planet radius divided by stellar radius (koi_prad / koi_srad). A planet's absolute size means little without context — this ratio captures the relationship between the two and helps identify eclipsing binaries, which tend to have extreme values.
+- **`radius_ratio`** — planet radius divided by stellar radius (koi_prad / koi_srad). A planet's absolute size means little without context. This ratio captures the relationship between the two and helps identify eclipsing binaries, which tend to have extreme values.
 - **`score_period`** — confidence score multiplied by orbital period, combining two independent signals: a high-confidence, long-period object is a strong planet candidate; a low-confidence, short-period object is more likely a false positive.
 - **`temp_ratio`** — equilibrium temperature divided by stellar effective temperature. Unusual ratios can indicate a misidentified signal rather than a real planet.
 
@@ -58,7 +58,7 @@ I then tuned XGBoost with RandomizedSearchCV over 40 iterations using stratified
 | XGBoost (tuned) | 80% | 0.76 |
 | Stacking Ensemble | 80% | 0.76 |
 
-The trickiest class was CANDIDATE — and that's not a model failure, that's just reality. These are objects scientists haven't confirmed yet, so no algorithm can reliably classify something that astronomers themselves are still unsure about.
+The trickiest class was CANDIDATE, and that's not a model failure, that's just reality. These are objects scientists haven't confirmed yet, so no algorithm can reliably classify something that astronomers themselves are still unsure about.
 
 ### Binary Classification (FALSE POSITIVE vs CONFIRMED)
 
@@ -72,7 +72,7 @@ To test this, I ran a separate binary classifier on just FALSE POSITIVE vs CONFI
 
 ### Candidate Priority Ranking
 
-Rather than forcing a classification on unresolved candidates, the pipeline assigns each one a confirmation probability and ranks them for follow-up prioritization.
+Rather than forcing a classification on unresolved candidates, the pipeline assigns each one a confirmation probability and ranks them for follow-up prioritisation.
 
 | Priority Tier | Threshold | Count |
 |---------------|-----------|-------|
@@ -89,11 +89,11 @@ SHAP analysis identifies the features driving model predictions. The results are
 ### Multiclass (FALSE POSITIVE / CANDIDATE / CONFIRMED)
 
 - **`score_sq`** — the most important feature overall. Squaring the confidence score amplifies the gap between high and low confidence objects, making the separation between confirmed planets and false positives more distinct.
-- **`koi_score`** — Kepler's own instrument confidence score, the second strongest signal. The model's reliance on this validates the approach — it is independently converging on the telescope's own judgment.
+- **`koi_score`** — Kepler's own instrument confidence score, the second strongest signal. The model's reliance on this validates the approach; it is independently converging on the telescope's own judgment.
 - **`koi_prad`** — planetary radius. Real planets fall within a physically constrained size range; objects outside this range are statistically more likely to be false positives.
 - **`radius_ratio`** — more discriminative than planetary radius alone. Extreme ratios are characteristic of eclipsing binary stars mimicking planetary transits.
 - **`koi_kepmag`** — the brightness of the star as observed by Kepler. Fainter stars produce noisier light curves, which increases the chance of a misidentified signal.
-- **`koi_multiplicity`** — stars with multiple candidates are far more likely to host real planets. The model picked this up without being told — it learned the multiplicity boost from the data.
+- **`koi_multiplicity`** — stars with multiple candidates are far more likely to host real planets. The model picked this up without being told; it learned the multiplicity boost from the data.
 - **`score_period`** — combines confidence and orbital period into one signal. High confidence at long periods strongly favours a real planet.
 - **`koi_steff`** — stellar effective temperature. Hotter stars are more active, which can produce false signals that mimic planetary transits.
 - **`koi_period`** — short orbital periods are disproportionately associated with false positives, as grazing eclipsing binaries preferentially cluster at short periods.
