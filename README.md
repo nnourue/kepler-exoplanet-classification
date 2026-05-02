@@ -1,20 +1,20 @@
-# Kepler Exoplanet Detection — KOI Features
+# Kepler Exoplanet Classification — KOI Features
 
-A machine learning pipeline to classify exoplanet candidates from NASA's Kepler Space Telescope into three categories: FALSE POSITIVE, CANDIDATE, and CONFIRMED — and rank unresolved candidates by their likelihood of being real planets.
+A machine learning pipeline to classify exoplanet candidates from NASA's Kepler Space Telescope into three categories: FALSE POSITIVE, CANDIDATE, and CONFIRMED, and rank unresolved candidates by their likelihood of being real planets.
 
 ---
 
 ## Overview
 
-NASA's Kepler Space Telescope identified thousands of potential planets by monitoring stellar brightness across the galaxy. However, a significant portion of these signals originate from eclipsing binary stars, instrument artifacts, or other astrophysical phenomena — not actual planets. Distinguishing real planets from false positives is a critical step in exoplanet research.
+NASA's Kepler Space Telescope identified thousands of potential planets by monitoring stellar brightness across the galaxy. However, a significant portion of these signals originates from eclipsing binary stars, instrument artefacts, or other astrophysical phenomena — not actual planets. Distinguishing real planets from false positives is a critical step in exoplanet research.
 
-Kepler flagged over 9,000 objects of interest during its mission. Each one had to be reviewed and labeled:
+Kepler flagged over 9,000 objects of interest during its mission. Each one had to be reviewed and labelled:
 
 - **Confirmed** — a verified exoplanet
-- **False Positive** — a mimicking signal, usually an eclipsing binary star or instrument artifact
+- **False Positive** — a mimicking signal, usually an eclipsing binary star or instrument artefact
 - **Candidate** — unresolved, awaiting follow-up confirmation
 
-Manual review is expensive and slow. This project automates the triage using machine learning, and for the ~400 unresolved candidates in the dataset, ranks them by how likely they are to be real planets — helping prioritize which ones deserve follow-up attention first.
+Manual review is expensive and slow. This project automates the triage using machine learning, and for the ~400 unresolved candidates in the dataset, ranks them by how likely they are to be real planets — helping prioritise which ones deserve follow-up attention first.
 
 ---
 
@@ -26,7 +26,7 @@ Manual review is expensive and slow. This project automates the triage using mac
 
 | Label | Class | Description |
 |-------|-------|-------------|
-| 0 | FALSE POSITIVE | Not a real exoplanet — likely an eclipsing binary or instrument artifact |
+| 0 | FALSE POSITIVE | Not a real exoplanet — likely an eclipsing binary or instrument artefact |
 | 1 | CANDIDATE | Unresolved — astronomers haven't confirmed or ruled it out yet |
 | 2 | CONFIRMED | Verified exoplanet |
 
@@ -94,7 +94,7 @@ SHAP analysis identifies the features driving model predictions. The results are
 - **`radius_ratio`** — more discriminative than planetary radius alone. Extreme ratios are characteristic of eclipsing binary stars mimicking planetary transits.
 - **`koi_kepmag`** — the brightness of the star as observed by Kepler. Fainter stars produce noisier light curves, which increases the chance of a misidentified signal.
 - **`koi_multiplicity`** — stars with multiple candidates are far more likely to host real planets. The model picked this up without being told — it learned the multiplicity boost from the data.
-- **`score_period`** — combines confidence and orbital period into one signal. High confidence at long periods strongly favors a real planet.
+- **`score_period`** — combines confidence and orbital period into one signal. High confidence at long periods strongly favours a real planet.
 - **`koi_steff`** — stellar effective temperature. Hotter stars are more active, which can produce false signals that mimic planetary transits.
 - **`koi_period`** — short orbital periods are disproportionately associated with false positives, as grazing eclipsing binaries preferentially cluster at short periods.
 
