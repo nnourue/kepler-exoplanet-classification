@@ -1,90 +1,134 @@
-# Kepler Exoplanet Classification
+# Kepler Exoplanet Detection — KOI Features
 
-A machine learning project to classify exoplanet candidates from NASA's Kepler Space Observatory into three categories: FALSE POSITIVE, CANDIDATE, and CONFIRMED.
+NASA's Kepler mission catalogued thousands of potential planets, but many turned out to be false signals from eclipsing binary stars or instrument noise. This project builds a machine learning pipeline to classify Kepler Objects of Interest (KOIs) using physical features — orbital period, planetary radius, equilibrium temperature, stellar properties, and confidence scores — distinguishing confirmed exoplanets from false positives, and ranking unresolved candidates by how likely they are to be real planets.
+
+---
+
+## The Problem
+
+Kepler flagged over 9,000 objects of interest during its mission. Each one had to be reviewed and labeled:
+
+- **Confirmed** — a verified exoplanet
+- **False Positive** — a mimicking signal, usually an eclipsing binary star or instrument artifact
+- **Candidate** — unresolved, awaiting follow-up confirmation
+
+Manual review is expensive and slow. This project automates the triage using machine learning, and for the ~400 unresolved candidates in the dataset, ranks them by how likely they are to be real planets — helping prioritize which ones deserve follow-up attention first.
+
+---
 
 ## Dataset
 
-[Kepler Exoplanet Dataset](https://www.kaggle.com/datasets/gauravkumar2525/kepler-exoplanet-dataset) — 9,564 observations with 9 orbital and stellar features.
+[Kepler Exoplanet Dataset on Kaggle](https://www.kaggle.com/datasets/gauravkumar2525/kepler-exoplanet-dataset) — sourced from the [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/)
+  
+| Feature | Description |
+| :--- | :--- |
+| `koi_score` | Confidence score for the planetary classification |
+| `koi_period` | Orbital period (days) |
+| `koi_prad` | Estimated planetary radius (Earth radii) |
+| `koi_teq` | Estimated equilibrium temperature (Kelvin) |
+| `koi_insol` | Insolation flux relative to Earth |
+| `koi_steff` | Effective temperature of the host star (Kelvin) |
+| `koi_srad` | Stellar radius (solar radii) |
+| `koi_slogg` | Surface gravity of the host star (log scale) |
+| `koi_kepmag` | Brightness of the star as observed by Kepler |
 
-| Label | Class | Description |
-|-------|-------|-------------|
-| 0 | FALSE POSITIVE | Not a real exoplanet |
-| 1 | CANDIDATE | Potential exoplanet, awaiting confirmation |
-| 2 | CONFIRMED | Verified exoplanet |
+---
 
-## What I did
+## Approach
 
-The dataset had 9 orbital and stellar features, so I started by engineering 4 new ones to capture relationships that the raw features couldn't express on their own:
+### Preprocessing
+- Iterative imputation for missing values
+- Log transformation on skewed features (`koi_period`, `koi_insol`, `koi_prad`, `koi_srad`)
+- RobustScaler normalization
+- All steps wrapped in a **scikit-learn Pipeline** to prevent data leakage
+- SMOTE oversampling to handle class imbalance
 
-- **score_period:** KOI score multiplied by orbital period, capturing how confidence scales with orbit length
-- **radius_ratio:** planet radius divided by stellar radius, a direct measure of how large the planet is relative to its star
-- **score_sq:** KOI score squared, to amplify the difference between high and low confidence signals
-- **temp_ratio:** equilibrium temperature divided by stellar effective temperature, indicating how much heat the planet receives from its star
+### Feature Engineering
+- `koi_multiplicity` — number of KOIs sharing the same host star (multi-planet systems are far more likely to be real, known as the Kepler multiplicity boost)
+- `score_period` — confidence score weighted by orbital period
+- `radius_ratio` — planet to stellar radius ratio
+- `score_sq` — squared confidence score
+- `temp_ratio` — equilibrium to stellar temperature ratio
 
-From there, I handled missing values with iterative imputation, scaled with RobustScaler (more stable than StandardScaler with outliers), and used SMOTE to fix the class imbalance since FALSE POSITIVEs heavily dominated the dataset.
+### Models
+- **Decision Tree** — baseline
+- **XGBoost** — tuned via RandomizedSearchCV (40 iterations, 5-fold StratifiedKFold)
+- **Stacking Ensemble** — XGBoost + Random Forest with Logistic Regression meta-learner
 
-I then ran XGBoost with RandomizedSearchCV over 40 iterations using stratified 5-fold cross-validation, and combined the tuned model with a Random Forest in a soft voting ensemble.
+---
 
 ## Results
 
-### Multiclass Classification (3 categories)
+### Multiclass Classification (FALSE POSITIVE / CANDIDATE / CONFIRMED)
 
-| Model | Accuracy | Macro Precision | Macro Recall | Macro F1 |
-|-------|----------|-----------------|--------------|----------|
-| Decision Tree | 0.71 | 0.71 | 0.71 | 0.67 |
-| XGBoost | 0.80 | 0.80 | 0.80 | 0.80 |
-| Ensemble | 0.77 | 0.77 | 0.77 | 0.77 |
+| Model | Accuracy | Macro F1 |
+| :---: | :---: | :---: |
+| Decision Tree | 76% | 0.71 |
+| XGBoost (tuned) | 80% | 0.76 |
+| Stacking Ensemble | 80% | 0.76 |
+
+The CANDIDATE class is intentionally the hardest to classify — these are objects that astronomers themselves have not been able to resolve. The model's difficulty with this class reflects the genuine ambiguity of the data, not a modeling failure.
 
 ### Binary Classification (FALSE POSITIVE vs CONFIRMED)
 
-| Class | Precision | Recall | F1-Score |
-|-------|-----------|--------|----------|
-| FALSE POSITIVE | 0.98 | 0.98 | 0.98 |
-| CONFIRMED | 0.97 | 0.96 | 0.97 |
-| **Macro Avg** | **0.97** | **0.97** | **0.97** |
-| **Accuracy** | — | — | **0.98** |
+Candidates excluded — the binary task focuses on cases where a ground truth label exists.
 
-The trickiest class was CANDIDATE, and that's not a model failure; that's just reality. These are objects scientists haven't confirmed yet, so no algorithm can reliably classify something that astronomers themselves are still unsure about.
+| Metric | Score |
+| :---: | :---: |
+| Accuracy | 97% |
+| ROC-AUC | 0.995 |
+| Average Precision | 0.99 |
 
-To test this, I ran a binary classifier on just FALSE POSITIVE vs CONFIRMED, dropping CANDIDATEs entirely. The results jumped to **0.98 accuracy** and **0.97 macro precision/recall/F1**, which confirms the multiclass ambiguity was coming from the labels, not the model.
+### Candidate Priority Ranking
 
-## Usage
+Rather than classifying candidates (which would be scientifically dishonest — astronomers labeled them unresolved for a reason), the model assigns each candidate a probability of being a confirmed planet and ranks them for follow-up priority.
 
-### Prerequisites
+- **42 candidates** ranked high priority (>80% confidence of being a real planet)
+- **281 candidates** likely false positives (<20% confidence)
+- **13 candidates** genuinely ambiguous (40–60% confidence)
 
-Install dependencies from requirements.txt:
+---
+
+## Astrophysical Interpretation
+
+SHAP analysis reveals which features drive predictions, and the results align with known astrophysics:
+
+- **`koi_score` / `score_sq`** — Kepler's own planet likelihood score is the dominant signal. The model learning to trust this validates the approach — it is essentially agreeing with the instrument's built-in confidence metric.
+- **`koi_multiplicity`** — stars with multiple KOIs are far more likely to host real planets. The probability that multiple independent false positive signals occur around the same star by chance is extremely low.
+- **`radius_ratio` (koi_prad / koi_srad)** — real planets occupy a physically constrained size range. Objects with extreme radius ratios are more likely eclipsing binaries masquerading as transits.
+- **`koi_teq` (equilibrium temperature)** — extreme temperatures correlate with false positives driven by stellar activity rather than a planetary companion.
+- **`koi_period`** — very short orbital periods are disproportionately associated with false positives, as grazing eclipsing binaries tend to cluster at short periods.
+
+---
+
+## Project Structure
+
+```
+/kaggle
+    exoplanets_data.csv
+/models
+    xgb_multiclass.pkl
+    xgb_binary.pkl
+    stacking_ensemble.pkl
+    preprocessing_pipeline.pkl
+/notebooks
+    kepler_koi_classification.ipynb
+/outputs
+README.md
+requirements.txt
+```
+
+---
+
+## How to Run
 
 ```bash
 pip install -r requirements.txt
+jupyter notebook notebooks/kepler_koi_classification.ipynb
 ```
 
-Or manually:
+---
 
-```bash
-pip install pandas numpy scikit-learn xgboost imbalanced-learn matplotlib seaborn jupyter
-```
+## Tools & Libraries
 
-### Running the Notebook
-
-```bash
-jupyter notebook exoplanet_classification.ipynb
-```
-
-The notebook is fully self-contained and walks through:
-1. Data loading and exploration
-2. Feature engineering and preprocessing
-3. Model training with hyperparameter tuning
-4. Performance evaluation with confusion matrices and classification reports
-5. Comparison of Decision Tree, XGBoost, and Ensemble models
-
-## Files
-
-- `exoplanet_classification.ipynb` — Main analysis notebook
-- `data/` — Folder containing the dataset
-  - `exoplanet_data.csv` — Raw Kepler exoplanet observations (9,564 rows, 9 features)
-- `requirements.txt` — Python dependencies
-- `README.md` — This file
-
-## What I'd do next
-
-The most natural next step is adding a feature importance analysis using SHAP values to understand which Kepler measurements actually drive the predictions. Features like radius_ratio and temp_ratio have real astronomical meaning, so it would be interesting to see if the model agrees with what astrophysics would predict.
+Python · XGBoost · scikit-learn · imbalanced-learn · SHAP · pandas · NumPy · Matplotlib · Seaborn

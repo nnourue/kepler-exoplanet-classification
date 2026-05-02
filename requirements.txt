@@ -3,5 +3,7 @@ numpy
 matplotlib
 seaborn
 scikit-learn
-xgboost
 imbalanced-learn
+xgboost
+shap
+joblib
